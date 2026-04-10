@@ -1,0 +1,6 @@
+@tailwind components;
+@tailwind utilities;
+
+.cover-page {
+  /* Minimal local overrides to ensure styling consistency since we skipped preflight */
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
+import { ChevronDown, AlertCircle, CheckCircle2, TrendingUp } from 'lucide-react';
 import { SKU_LIST } from '../utils/skus';
 import { useFetch } from '../hooks/useFetch';
 
@@ -7,29 +8,26 @@ Chart.register(...registerables);
 
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-const s = {
-  header: { display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 },
-  sectionTitle: { fontSize:14, fontWeight:500 },
-  select: {
-    fontSize:13, padding:'5px 12px', borderRadius:8,
-    border:'0.5px solid rgba(0,0,0,0.18)', background:'#f0efe9',
-    color:'#1a1a18', cursor:'pointer', outline:'none',
-  },
-  section: {
-    background:'#fff', border:'0.5px solid rgba(0,0,0,0.08)',
-    borderRadius:14, padding:'1.25rem', marginBottom:'1rem',
-  },
-  legend: { display:'flex', gap:16, flexWrap:'wrap', fontSize:12, color:'#8a8981', marginBottom:12 },
-  dot: { width:10, height:10, borderRadius:2, display:'inline-block', marginRight:4 },
-  table: { width:'100%', borderCollapse:'collapse', fontSize:13 },
-  th: { textAlign:'left', padding:'8px 12px', color:'#8a8981', fontWeight:400, fontSize:12, borderBottom:'0.5px solid rgba(0,0,0,0.08)' },
-  td: { padding:'9px 12px', borderBottom:'0.5px solid rgba(0,0,0,0.06)' },
-};
-
-function confStyle(conf) {
-  if (conf === 'High') return { color:'#3B6D11', fontWeight:500 };
-  if (conf === 'Low')  return { color:'#A32D2D', fontWeight:500 };
-  return { color:'#854F0B', fontWeight:500 };
+function ConfBadge({ conf }) {
+  if (conf === 'High') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-100 text-green-700 text-[11px] font-bold tracking-wide uppercase">
+        <CheckCircle2 className="w-3 h-3" /> High
+      </span>
+    );
+  }
+  if (conf === 'Low') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-100 text-red-700 text-[11px] font-bold tracking-wide uppercase">
+        <AlertCircle className="w-3 h-3" /> Low
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-100 text-amber-700 text-[11px] font-bold tracking-wide uppercase">
+      <TrendingUp className="w-3 h-3" /> Med
+    </span>
+  );
 }
 
 export default function ForecastTab() {
@@ -61,38 +59,50 @@ export default function ForecastTab() {
         datasets: [
           {
             label: 'Conf high', data: fcHi,
-            borderColor: 'transparent', backgroundColor: 'rgba(99,153,34,0.10)',
-            fill: '+1', pointRadius: 0, tension: 0.4,
+            borderColor: 'transparent', backgroundColor: 'rgba(71, 85, 105, 0.04)',
+            fill: '+1', pointRadius: 0, tension: 0.5,
           },
           {
             label: 'Conf low', data: fcLo,
-            borderColor: 'transparent', backgroundColor: 'rgba(99,153,34,0.10)',
-            fill: false, pointRadius: 0, tension: 0.4,
+            borderColor: 'transparent', backgroundColor: 'rgba(71, 85, 105, 0.04)',
+            fill: false, pointRadius: 0, tension: 0.5,
           },
           {
             label: 'Historical', data: histData,
-            borderColor: '#378ADD', backgroundColor: 'transparent',
-            borderWidth: 1.5, pointRadius: 0, tension: 0.4,
+            borderColor: '#94a3b8', backgroundColor: 'transparent',
+            borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#94a3b8', tension: 0.5,
+            pointHoverRadius: 5, pointHoverBackgroundColor: '#94a3b8'
           },
           {
             label: 'Forecast', data: fcData,
-            borderColor: '#639922', backgroundColor: 'transparent',
-            borderWidth: 2, borderDash: [5, 3],
-            pointRadius: 3, pointBackgroundColor: '#639922', tension: 0.4,
+            borderColor: '#334155', backgroundColor: 'transparent',
+            borderWidth: 2, borderDash: [0, 0], // The reference has a solid thin line
+            pointRadius: 3, pointBackgroundColor: '#334155', pointHoverRadius: 5, pointHoverBackgroundColor: '#334155', tension: 0.5,
           },
         ],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: { 
+           legend: { display: false },
+           tooltip: {
+             backgroundColor: 'rgba(24, 24, 27, 0.9)',
+             titleFont: { size: 13, family: 'sans-serif' },
+             bodyFont: { size: 12, family: 'sans-serif' },
+             padding: 12, cornerRadius: 8,
+             displayColors: true,
+           }
+        },
         scales: {
           x: {
-            ticks: { maxTicksLimit: 10, font: { size: 11 }, color: '#8a8981' },
-            grid: { color: 'rgba(0,0,0,0.04)' },
+            grid: { display: false },
+            ticks: { maxTicksLimit: 8, font: { size: 11, family: 'sans-serif' }, color: '#a1a1aa' },
           },
           y: {
-            ticks: { font: { size: 11 }, color: '#8a8981' },
-            grid: { color: 'rgba(0,0,0,0.04)' },
+            border: { display: false },
+            grid: { color: 'rgba(0,0,0,0.03)' },
+            ticks: { font: { size: 11, family: 'sans-serif' }, color: '#a1a1aa', padding: 10 },
           },
         },
       },
@@ -104,86 +114,124 @@ export default function ForecastTab() {
   const summary  = data?.summary  || {};
 
   return (
-    <div>
-      <div style={s.section}>
-        <div style={s.header}>
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <span style={s.sectionTitle}>Next 7 days forecast</span>
-            <select style={s.select} value={histDays} onChange={e => setHistDays(Number(e.target.value))}>
-              <option value={30}>30d history</option>
-              <option value={60}>60d history</option>
-              <option value={90}>90d history</option>
-            </select>
+    <div className="flex flex-col gap-6">
+      
+      {/* CHART SECTION */}
+      <div className="bg-white border border-zinc-200/80 rounded-[1.5rem] p-6 md:p-8 shadow-[0_2px_12px_rgb(0,0,0,0.02)]">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900">Next 7 days forecast</h2>
+            <div className="relative">
+               <select 
+                 className="appearance-none bg-zinc-50 border border-zinc-200 text-zinc-700 text-[13px] font-medium py-1.5 pl-3 pr-8 rounded-lg outline-none cursor-pointer hover:bg-zinc-100 transition-colors"
+                 value={histDays} onChange={e => setHistDays(Number(e.target.value))}
+               >
+                 <option value={30}>30d history</option>
+                 <option value={60}>60d history</option>
+                 <option value={90}>90d history</option>
+               </select>
+               <ChevronDown className="w-3.5 h-3.5 text-zinc-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
-          <select style={s.select} value={skuIdx} onChange={e => setSkuIdx(Number(e.target.value))}>
-            {SKU_LIST.map(sku => (
-              <option key={sku.index} value={sku.index}>{sku.name}</option>
-            ))}
-          </select>
+          
+          <div className="relative w-full lg:w-64">
+             <select 
+               className="w-full appearance-none bg-zinc-900 text-white border border-zinc-800 text-[13px] font-medium py-2.5 pl-4 pr-10 rounded-xl outline-none cursor-pointer shadow-lg hover:bg-black transition-colors"
+               value={skuIdx} onChange={e => setSkuIdx(Number(e.target.value))}
+             >
+               {SKU_LIST.map(sku => (
+                 <option key={sku.index} value={sku.index}>{sku.name}</option>
+               ))}
+             </select>
+             <ChevronDown className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
 
-        {loading && <div style={{ color:'#8a8981', fontSize:13, padding:'2rem 0', textAlign:'center' }}>Loading...</div>}
+        {loading && <div className="h-[280px] w-full flex items-center justify-center text-[13px] text-zinc-400 font-medium tracking-wide">Synthesizing network telemetry...</div>}
 
         {!loading && (
-          <>
-            <div style={s.legend}>
-              <span><span style={{ ...s.dot, background:'#378ADD' }}></span>Historical</span>
-              <span><span style={{ ...s.dot, background:'#639922' }}></span>Forecast</span>
-              <span><span style={{ ...s.dot, background:'rgba(99,153,34,0.25)', border:'0.5px solid #639922' }}></span>Confidence band</span>
+          <div className="animate-in fade-in duration-500">
+            <div className="flex gap-6 flex-wrap text-[11px] font-bold tracking-widest uppercase text-zinc-500 mb-6">
+              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#94a3b8]" /> Historical</span>
+              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#334155]" /> Forecast</span>
+              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#e2e8f0]" /> Confidence band</span>
             </div>
-            <div style={{ position:'relative', width:'100%', height:260 }}>
+            
+            <div className="relative w-full h-[280px]">
               <canvas ref={chartRef} />
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginTop:16 }}>
-              <div style={{ background:'#f0efe9', borderRadius:8, padding:'10px 14px' }}>
-                <div style={{ fontSize:11, color:'#8a8981' }}>7-day total forecast</div>
-                <div style={{ fontSize:20, fontWeight:500, marginTop:2 }}>{summary.forecast7dTotal} units</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-zinc-100">
+              <div className="bg-zinc-50 border border-zinc-100 rounded-2xl p-5 hover:bg-zinc-100/80 transition-colors">
+                <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-400 mb-2">7-Day Projection</div>
+                <div className="text-2xl font-medium tracking-tight text-zinc-900">{summary.forecast7dTotal} <span className="text-[13px] text-zinc-400 font-normal ml-1">units</span></div>
               </div>
-              <div style={{ background:'#f0efe9', borderRadius:8, padding:'10px 14px' }}>
-                <div style={{ fontSize:11, color:'#8a8981' }}>Stock on hand</div>
-                <div style={{ fontSize:20, fontWeight:500, marginTop:2 }}>{summary.stockOnHand?.toLocaleString()}</div>
+              <div className="bg-zinc-50 border border-zinc-100 rounded-2xl p-5 hover:bg-zinc-100/80 transition-colors">
+                <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-400 mb-2">Stock On Hand</div>
+                <div className="text-2xl font-medium tracking-tight text-zinc-900">{summary.stockOnHand?.toLocaleString()} <span className="text-[13px] text-zinc-400 font-normal ml-1">units</span></div>
               </div>
-              <div style={{ background: summary.stockoutRisk === 'critical' ? '#fcebeb' : summary.stockoutRisk === 'warning' ? '#faeeda' : '#eaf3de', borderRadius:8, padding:'10px 14px' }}>
-                <div style={{ fontSize:11, color:'#8a8981' }}>Stock cover</div>
-                <div style={{ fontSize:20, fontWeight:500, marginTop:2,
-                  color: summary.stockoutRisk === 'critical' ? '#A32D2D' : summary.stockoutRisk === 'warning' ? '#854F0B' : '#3B6D11'
-                }}>{summary.stockCoverDays}d</div>
+              <div className={`rounded-2xl p-5 border transition-colors ${
+                 summary.stockoutRisk === 'critical' ? 'bg-red-50/50 border-red-100' : 
+                 summary.stockoutRisk === 'warning' ? 'bg-amber-50/50 border-amber-100' : 'bg-green-50/50 border-green-100'
+              }`}>
+                <div className="text-[11px] font-bold tracking-widest uppercase text-zinc-400 mb-2">Days of Cover</div>
+                <div className={`text-2xl font-medium tracking-tight ${
+                   summary.stockoutRisk === 'critical' ? 'text-red-600' : 
+                   summary.stockoutRisk === 'warning' ? 'text-amber-600' : 'text-green-600'
+                }`}>{summary.stockCoverDays} <span className="text-[13px] opacity-60 font-normal ml-1">days remaining</span></div>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
 
+      {/* TABLE SECTION */}
       {!loading && forecast.length > 0 && (
-        <div style={s.section}>
-          <div style={s.header}><span style={s.sectionTitle}>Daily breakdown</span></div>
-          <table style={s.table}>
-            <thead>
-              <tr>
-                {['Date','Day','Forecast','Low','High','Confidence'].map(h => (
-                  <th key={h} style={s.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {forecast.map((f, i) => {
-                const dow = DAYS[new Date(f.date).getDay()];
-                const baseVal = data?.sku?.base || 20;
-                const conf = f.forecast > baseVal * 1.1 ? 'High' : f.forecast < baseVal * 0.9 ? 'Low' : 'Med';
-                return (
-                  <tr key={i}>
-                    <td style={s.td}>{f.date.slice(5)}</td>
-                    <td style={s.td}>{dow}</td>
-                    <td style={{ ...s.td, fontWeight:500 }}>{f.forecast}</td>
-                    <td style={{ ...s.td, color:'#8a8981' }}>{f.low}</td>
-                    <td style={{ ...s.td, color:'#8a8981' }}>{f.high}</td>
-                    <td style={{ ...s.td, ...confStyle(conf) }}>{conf}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="bg-white border border-zinc-200/80 rounded-[1.5rem] pt-6 pb-2 px-6 md:px-8 shadow-[0_2px_12px_rgb(0,0,0,0.02)] animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900 mb-6">Daily Breakdown</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px] text-zinc-600 min-w-[600px]">
+              <thead>
+                <tr>
+                  {['Date','Day','Forecast Volume','Lower Bound','Upper Bound','AI Confidence'].map((h, i) => (
+                    <th key={h} className={`pb-4 font-semibold text-zinc-400 tracking-wide border-b border-zinc-100 ${i === 0 ? 'text-left' : 'text-left pl-4'}`}>
+                       {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {forecast.map((f, i) => {
+                  const dow = DAYS[new Date(f.date).getDay()];
+                  const baseVal = data?.sku?.base || 20;
+                  const conf = f.forecast > baseVal * 1.1 ? 'High' : f.forecast < baseVal * 0.9 ? 'Low' : 'Med';
+                  
+                  return (
+                    <tr key={i} className="group hover:bg-zinc-50/50 transition-colors">
+                      <td className="py-4 border-b border-zinc-50 group-last:border-0 text-zinc-900 font-medium">
+                         {f.date.slice(5).replace('-', ' / ')}
+                      </td>
+                      <td className="py-4 pl-4 border-b border-zinc-50 group-last:border-0 text-zinc-500">
+                         {dow}
+                      </td>
+                      <td className="py-4 pl-4 border-b border-zinc-50 group-last:border-0">
+                         <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-bold">{f.forecast}</span>
+                      </td>
+                      <td className="py-4 pl-4 border-b border-zinc-50 group-last:border-0 text-zinc-400 font-medium">
+                         {f.low}
+                      </td>
+                      <td className="py-4 pl-4 border-b border-zinc-50 group-last:border-0 text-zinc-400 font-medium">
+                         {f.high}
+                      </td>
+                      <td className="py-4 pl-4 border-b border-zinc-50 group-last:border-0">
+                         <ConfBadge conf={conf} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

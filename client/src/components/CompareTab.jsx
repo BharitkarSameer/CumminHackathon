@@ -4,17 +4,6 @@ import { useFetch } from '../hooks/useFetch';
 
 Chart.register(...registerables);
 
-const s = {
-  section:  { background:'#fff', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:14, padding:'1.25rem', marginBottom:'1rem' },
-  title:    { fontSize:14, fontWeight:500, marginBottom:14 },
-  row:      { display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'0.5px solid rgba(0,0,0,0.06)' },
-  rowName:  { width:160, fontSize:13, flexShrink:0 },
-  barWrap:  { flex:1, height:6, background:'#f0efe9', borderRadius:3, overflow:'hidden' },
-  bar:      { height:'100%', borderRadius:3 },
-  rowVal:   { width:70, textAlign:'right', fontSize:12, color:'#8a8981' },
-  rowTrend: { width:52, textAlign:'right', fontSize:12 },
-};
-
 export default function CompareTab() {
   const { data, loading } = useFetch('/api/forecast/all');
   const coverRef   = useRef(null);
@@ -23,7 +12,7 @@ export default function CompareTab() {
   useEffect(() => {
     if (!data || !coverRef.current) return;
     const sorted = [...data].sort((a, b) => b.forecast7dTotal - a.forecast7dTotal);
-    const h = Math.max(320, sorted.length * 38 + 60);
+    const h = Math.max(380, sorted.length * 45 + 60);
     coverRef.current.parentElement.style.height = h + 'px';
 
     if (coverChart.current) coverChart.current.destroy();
@@ -32,52 +21,60 @@ export default function CompareTab() {
       data: {
         labels: sorted.map(s => s.name.split(' ').slice(0,2).join(' ')),
         datasets: [
-          { label: 'Stock cover (days)', data: sorted.map(s => s.stockCoverDays), backgroundColor: '#B5D4F4', borderRadius: 3 },
-          { label: 'Lead time (days)',   data: sorted.map(s => s.leadTimeDays),   backgroundColor: '#E24B4A', borderRadius: 3 },
+          { label: 'Stock cover (days)', data: sorted.map(s => s.stockCoverDays), backgroundColor: '#4285f4', borderRadius: 6, barPercentage: 0.7 },
+          { label: 'Lead time (days)',   data: sorted.map(s => s.leadTimeDays),   backgroundColor: '#e4e4e7', borderRadius: 6, barPercentage: 0.7, hoverBackgroundColor: '#d4d4d8' },
         ],
       },
       options: {
         indexAxis: 'y',
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+             backgroundColor: 'rgba(24, 24, 27, 0.9)',
+             padding: 12, cornerRadius: 8,
+          }
+        },
         scales: {
-          x: { ticks: { font:{size:11}, color:'#8a8981' }, grid: { color:'rgba(0,0,0,0.04)' } },
-          y: { ticks: { font:{size:11}, color:'#8a8981' }, grid: { display:false } },
+          x: { grid: { color:'rgba(0,0,0,0.03)' }, ticks: { font:{size:11, family: 'sans-serif'}, color:'#a1a1aa', padding:8 }, border: { display: false } },
+          y: { grid: { display:false }, ticks: { font:{size:12, family: 'sans-serif', weight: '500'}, color:'#52525b' }, border: { display: false } },
         },
       },
     });
     return () => { if (coverChart.current) coverChart.current.destroy(); };
   }, [data]);
 
-  if (loading) return <div style={{ color:'#8a8981', fontSize:13, padding:'2rem', textAlign:'center' }}>Loading...</div>;
+  if (loading) return <div className="h-[200px] flex items-center justify-center text-[13px] text-zinc-400 font-medium tracking-wide">Computing matrices...</div>;
   if (!data)   return null;
 
   const sorted = [...data].sort((a, b) => b.forecast7dTotal - a.forecast7dTotal);
   const maxFc  = sorted[0]?.forecast7dTotal || 1;
 
   return (
-    <div>
-      <div style={s.section}>
-        <div style={s.title}>7-day forecast — all SKUs ranked</div>
-        <div>
-          <div style={{ ...s.row, borderBottom:'0.5px solid rgba(0,0,0,0.1)', paddingBottom:6, marginBottom:4 }}>
-            <div style={{ ...s.rowName, fontSize:11, color:'#8a8981' }}>SKU</div>
-            <div style={{ flex:1, fontSize:11, color:'#8a8981' }}>Volume</div>
-            <div style={{ ...s.rowVal, fontSize:11, color:'#8a8981' }}>7d units</div>
-            <div style={{ ...s.rowTrend, fontSize:11, color:'#8a8981' }}>Trend</div>
+    <div className="flex flex-col gap-6 animate-in fade-in duration-500">
+      <div className="bg-white border border-zinc-200/80 rounded-[1.5rem] p-6 lg:p-8 shadow-[0_2px_12px_rgb(0,0,0,0.02)]">
+        <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900 mb-8">7-Day Global Forecast Rankings</h2>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-4 pb-3 border-b border-zinc-100 mb-3 px-2">
+            <div className="w-[160px] md:w-[200px] text-[11px] font-bold tracking-widest uppercase text-zinc-400 shrink-0">SKU</div>
+            <div className="flex-1 text-[11px] font-bold tracking-widest uppercase text-zinc-400">Velocity Pattern</div>
+            <div className="w-[80px] text-right text-[11px] font-bold tracking-widest uppercase text-zinc-400 shrink-0">7D Volume</div>
+            <div className="w-[70px] text-right text-[11px] font-bold tracking-widest uppercase text-zinc-400 shrink-0">Trend</div>
           </div>
           {sorted.map((sku, i) => {
             const pct = Math.round((sku.forecast7dTotal / maxFc) * 100);
             const trendPct = Math.round((sku.trend - 1) * 100);
-            const trendColor = sku.trend >= 1 ? '#3B6D11' : '#A32D2D';
+            const trendColor = sku.trend >= 1 ? 'text-green-600' : 'text-red-500';
             return (
-              <div key={sku.id} style={{ ...s.row, ...(i === sorted.length - 1 ? { borderBottom:'none' } : {}) }}>
-                <div style={s.rowName}>{sku.name.split(' ').slice(0,2).join(' ')}</div>
-                <div style={s.barWrap}>
-                  <div style={{ ...s.bar, width:`${pct}%`, background: sku.color }} />
+              <div key={sku.id} className="group flex items-center gap-4 py-3.5 px-2 border-b border-zinc-50 last:border-0 hover:bg-zinc-50/50 rounded-xl transition-colors">
+                <div className="w-[160px] md:w-[200px] text-[13px] font-semibold tracking-tight text-zinc-800 shrink-0 truncate">
+                   {sku.name.split(' ').slice(0,2).join(' ')}
                 </div>
-                <div style={s.rowVal}>{sku.forecast7dTotal}</div>
-                <div style={{ ...s.rowTrend, color: trendColor }}>
+                <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width:`${pct}%`, backgroundColor: sku.color }} />
+                </div>
+                <div className="w-[80px] text-right text-[14px] font-bold text-zinc-600 shrink-0">{sku.forecast7dTotal}</div>
+                <div className={`w-[70px] text-right text-[13px] font-bold shrink-0 ${trendColor}`}>
                   {trendPct >= 0 ? '+' : ''}{trendPct}%
                 </div>
               </div>
@@ -86,13 +83,13 @@ export default function CompareTab() {
         </div>
       </div>
 
-      <div style={s.section}>
-        <div style={s.title}>Stock cover vs lead time (days)</div>
-        <div style={{ display:'flex', gap:16, fontSize:12, color:'#8a8981', marginBottom:12 }}>
-          <span><span style={{ width:10, height:10, borderRadius:2, display:'inline-block', background:'#B5D4F4', marginRight:4 }}></span>Stock cover</span>
-          <span><span style={{ width:10, height:10, borderRadius:2, display:'inline-block', background:'#E24B4A', marginRight:4 }}></span>Lead time</span>
+      <div className="bg-white border border-zinc-200/80 rounded-[1.5rem] p-6 lg:p-8 shadow-[0_2px_12px_rgb(0,0,0,0.02)]">
+        <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900 mb-8">Stock Cover vs Replenishment Lead Time</h2>
+        <div className="flex items-center gap-6 mb-8">
+          <span className="flex items-center gap-2 text-[12px] font-medium tracking-wide text-zinc-500 uppercase"><div className="w-3 h-3 rounded bg-[#4285f4]"></div> Stock Cover Capacity</span>
+          <span className="flex items-center gap-2 text-[12px] font-medium tracking-wide text-zinc-500 uppercase"><div className="w-3 h-3 rounded bg-zinc-300"></div> Supplier Lead Time</span>
         </div>
-        <div style={{ position:'relative', width:'100%', height:320 }}>
+        <div className="relative w-full overflow-hidden pr-4">
           <canvas ref={coverRef} />
         </div>
       </div>

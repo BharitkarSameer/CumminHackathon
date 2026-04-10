@@ -1,69 +1,104 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { useFetch } from '../hooks/useFetch';
 
 Chart.register(...registerables);
 
-const s = {
-  section: { background:'#fff', border:'0.5px solid rgba(0,0,0,0.08)', borderRadius:14, padding:'1.25rem', marginBottom:'1rem' },
-  header:  { display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 },
-  title:   { fontSize:14, fontWeight:500 },
-  legend:  { display:'flex', gap:14, flexWrap:'wrap', fontSize:12, color:'#8a8981', marginBottom:12 },
-  dot:     { width:10, height:10, borderRadius:2, display:'inline-block', marginRight:4 },
-  grid2:   { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' },
-};
-
-function LineChart({ canvasRef, height = 280 }) {
-  return (
-    <div style={{ position:'relative', width:'100%', height }}>
-      <canvas ref={canvasRef} />
-    </div>
-  );
-}
+const DAY_OPTIONS = [30, 60, 90];
 
 export default function HistoryTab() {
-  const { data: allSkus, loading: loadingSkus } = useFetch('/api/history?days=90');
-  const { data: monthly, loading: loadingMonthly } = useFetch('/api/history/monthly');
-  const { data: channels } = useFetch('/api/history/channels');
+  const [days, setDays] = useState(90);
+  const [hoveredSku, setHoveredSku] = useState(null); // null = all visible
 
-  const multiRef   = useRef(null);
-  const monthRef   = useRef(null);
-  const channelRef = useRef(null);
+  const { data: allSkus, loading: loadingSkus } = useFetch(`/api/history?days=${days}`);
+  const { data: monthly, loading: loadingMonthly } = useFetch('/api/history/monthly');
+  const { data: channels, loading: loadingChannels } = useFetch('/api/history/channels');
+
+  const multiRef     = useRef(null);
+  const monthRef     = useRef(null);
+  const channelRef   = useRef(null);
   const multiChart   = useRef(null);
   const monthChart   = useRef(null);
   const channelChart = useRef(null);
 
-  // Multi-SKU line chart (top 5)
+  // ─── Multi-SKU line chart (all SKUs) ───────────────────────────────────────
   useEffect(() => {
     if (!allSkus || !multiRef.current) return;
-    const top5 = allSkus.slice(0, 5);
-    const labels = top5[0].data.map((_, i) => i % 15 === 0 ? top5[0].data[i]?.date?.slice(5) || '' : '');
+
+    const labels = allSkus[0].data.map((d, i) =>
+      i % Math.ceil(allSkus[0].data.length / 6) === 0 ? (d?.date?.slice(5) || '') : ''
+    );
+
     if (multiChart.current) multiChart.current.destroy();
     multiChart.current = new Chart(multiRef.current, {
       type: 'line',
       data: {
         labels,
-        datasets: top5.map(sku => ({
-          label: sku.name.split(' ')[0],
+        datasets: allSkus.map(sku => ({
+          label: sku.name.split(' ').slice(0, 2).join(' '),
           data: sku.data.map(d => d.units_sold),
           borderColor: sku.color,
           backgroundColor: 'transparent',
-          borderWidth: 1.5, pointRadius: 0, tension: 0.4,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.5,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: sku.color,
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
         })),
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(17, 17, 17, 0.92)',
+            titleFont: { size: 12, family: 'sans-serif', weight: '600' },
+            bodyFont:  { size: 11, family: 'sans-serif' },
+            padding: 12,
+            cornerRadius: 10,
+            boxPadding: 4,
+          },
+        },
         scales: {
-          x: { ticks: { font:{size:11}, color:'#8a8981' }, grid: { color:'rgba(0,0,0,0.04)' } },
-          y: { ticks: { font:{size:11}, color:'#8a8981' }, grid: { color:'rgba(0,0,0,0.04)' } },
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { font: { size: 11, family: 'sans-serif' }, color: '#a1a1aa' },
+          },
+          y: {
+            border: { display: false },
+            grid: { color: 'rgba(0,0,0,0.04)' },
+            ticks: { font: { size: 11, family: 'sans-serif' }, color: '#a1a1aa', padding: 8 },
+          },
         },
       },
     });
     return () => { if (multiChart.current) multiChart.current.destroy(); };
   }, [allSkus]);
 
-  // Monthly bar
+  // ─── Apply hover dimming whenever hoveredSku changes ───────────────────────
+  useEffect(() => {
+    if (!multiChart.current || !allSkus) return;
+    multiChart.current.data.datasets.forEach((ds, idx) => {
+      if (hoveredSku === null) {
+        ds.borderWidth = 2;
+        ds.borderColor = allSkus[idx].color;
+      } else if (allSkus[idx].name.split(' ').slice(0, 2).join(' ') === hoveredSku) {
+        ds.borderWidth = 3.5;
+        ds.borderColor = allSkus[idx].color;
+      } else {
+        ds.borderWidth = 1;
+        ds.borderColor = allSkus[idx].color + '30'; // dim: add alpha
+      }
+    });
+    multiChart.current.update('none');
+  }, [hoveredSku, allSkus]);
+
+  // ─── Monthly bar ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!monthly || !monthRef.current) return;
     if (monthChart.current) monthChart.current.destroy();
@@ -74,23 +109,27 @@ export default function HistoryTab() {
         datasets: [{
           label: 'Units sold',
           data: monthly.map(m => m.units),
-          backgroundColor: '#378ADD',
-          borderRadius: 4,
+          backgroundColor: '#4285f4',
+          borderRadius: 6,
+          hoverBackgroundColor: '#1a73e8',
         }],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(17,17,17,0.92)', padding: 12, cornerRadius: 10 },
+        },
         scales: {
-          x: { ticks: { font:{size:11}, color:'#8a8981' }, grid: { display:false } },
-          y: { ticks: { font:{size:11}, color:'#8a8981' }, grid: { color:'rgba(0,0,0,0.04)' } },
+          x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11, family: 'sans-serif' }, color: '#a1a1aa' } },
+          y: { grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false }, ticks: { font: { size: 11, family: 'sans-serif' }, color: '#a1a1aa', padding: 8 } },
         },
       },
     });
     return () => { if (monthChart.current) monthChart.current.destroy(); };
   }, [monthly]);
 
-  // Channel donut
+  // ─── Channel donut ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!channels || !channelRef.current) return;
     if (channelChart.current) channelChart.current.destroy();
@@ -102,61 +141,136 @@ export default function HistoryTab() {
           data: channels.map(c => c.units),
           backgroundColor: channels.map(c => c.color),
           borderWidth: 0,
+          hoverOffset: 6,
         }],
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: { legend: { display: false } },
+        responsive: true, maintainAspectRatio: false, cutout: '70%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(17,17,17,0.92)', padding: 12, cornerRadius: 10,
+            callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw}%` },
+          },
+        },
       },
     });
     return () => { if (channelChart.current) channelChart.current.destroy(); };
   }, [channels]);
 
-  const top5 = allSkus ? allSkus.slice(0, 5) : [];
-
   return (
-    <div>
-      <div style={s.section}>
-        <div style={s.header}><span style={s.title}>Historical sales — last 90 days (top 5 SKUs)</span></div>
-        {!loadingSkus && (
-          <div style={s.legend}>
-            {top5.map(sku => (
-              <span key={sku.id}>
-                <span style={{ ...s.dot, background: sku.color }}></span>
-                {sku.name.split(' ').slice(0,2).join(' ')}
-              </span>
+    <div className="flex flex-col gap-6">
+      {/* ── Historical Velocity Card ──────────────────────────────────────── */}
+      <div className="bg-white border border-zinc-200/80 rounded-[1.5rem] p-6 md:p-8 shadow-[0_2px_12px_rgb(0,0,0,0.02)]">
+        {/* Header row */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900">
+            Historical velocity —{' '}
+            <span className="text-zinc-400 font-medium">Last {days} days</span>
+          </h2>
+
+          {/* Day selector */}
+          <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-full">
+            {DAY_OPTIONS.map(d => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                style={{
+                  padding: '4px 16px',
+                  borderRadius: '999px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  transition: 'all 0.2s',
+                  border: 'none',
+                  cursor: 'pointer',
+                  backgroundColor: days === d ? '#18181b' : 'transparent',
+                  color: days === d ? '#fff' : '#71717a',
+                }}
+              >
+                {d}d
+              </button>
             ))}
           </div>
+        </div>
+
+        {/* Legend — all SKUs, hover to highlight */}
+        {!loadingSkus && allSkus && (
+          <div className="flex flex-wrap gap-x-5 gap-y-2 mb-5">
+            {allSkus.map(sku => {
+              const label = sku.name.split(' ').slice(0, 2).join(' ');
+              const isHovered = hoveredSku === label;
+              const isDimmed  = hoveredSku !== null && !isHovered;
+              return (
+                <button
+                  key={sku.id}
+                  onMouseEnter={() => setHoveredSku(label)}
+                  onMouseLeave={() => setHoveredSku(null)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    fontSize: '12px', fontWeight: isHovered ? '700' : '500',
+                    color: isDimmed ? '#d4d4d8' : '#52525b',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{
+                    width: '10px', height: '10px', borderRadius: '50%',
+                    backgroundColor: isDimmed ? '#d4d4d8' : sku.color,
+                    transition: 'background-color 0.15s',
+                    flexShrink: 0,
+                  }} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         )}
+
+        {/* Chart */}
         {loadingSkus
-          ? <div style={{ color:'#8a8981', fontSize:13, padding:'2rem 0', textAlign:'center' }}>Loading...</div>
-          : <LineChart canvasRef={multiRef} height={280} />
+          ? <div className="h-[300px] flex items-center justify-center text-[13px] text-zinc-400 font-medium tracking-wide">Loading historical data...</div>
+          : (
+            <div
+              className="relative w-full h-[300px]"
+              onMouseLeave={() => setHoveredSku(null)}
+            >
+              <canvas ref={multiRef} />
+            </div>
+          )
         }
       </div>
 
-      <div style={s.grid2}>
-        <div style={s.section}>
-          <div style={s.header}><span style={s.title}>Monthly units sold</span></div>
+      {/* ── Bottom row: Monthly + Channel ────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white border border-zinc-200/80 rounded-[1.5rem] p-6 lg:p-8 shadow-[0_2px_12px_rgb(0,0,0,0.02)]">
+          <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900 mb-8">Monthly aggregates</h2>
           {loadingMonthly
-            ? <div style={{ color:'#8a8981', fontSize:13, padding:'1rem 0', textAlign:'center' }}>Loading...</div>
-            : <div style={{ position:'relative', width:'100%', height:200 }}><canvas ref={monthRef} /></div>
+            ? <div className="h-[200px] flex items-center justify-center text-[13px] text-zinc-400 font-medium">Aggregating...</div>
+            : <div className="relative w-full h-[200px]"><canvas ref={monthRef} /></div>
           }
         </div>
 
-        <div style={s.section}>
-          <div style={s.header}><span style={s.title}>Sales by channel</span></div>
-          <div style={{ position:'relative', width:'100%', height:160 }}><canvas ref={channelRef} /></div>
-          {channels && (
-            <div style={{ ...s.legend, marginTop:12, marginBottom:0 }}>
-              {channels.map(c => (
-                <span key={c.channel}>
-                  <span style={{ ...s.dot, background: c.color }}></span>
-                  {c.channel} {c.units}%
-                </span>
-              ))}
+        <div className="bg-white border border-zinc-200/80 rounded-[1.5rem] p-6 lg:p-8 shadow-[0_2px_12px_rgb(0,0,0,0.02)]">
+          <h2 className="text-[17px] font-semibold tracking-tight text-zinc-900 mb-8">Volume by Channel</h2>
+          <div className="flex flex-col sm:flex-row items-center gap-8">
+            <div className="relative w-[160px] h-[160px] flex-shrink-0">
+              {loadingChannels
+                ? <div className="absolute inset-0 flex items-center justify-center text-[12px] text-zinc-400">Loading...</div>
+                : <canvas ref={channelRef} />
+              }
             </div>
-          )}
+            {channels && (
+              <div className="flex flex-col gap-3">
+                {channels.map(c => (
+                  <span key={c.channel} className="flex items-center gap-3">
+                    <div style={{ backgroundColor: c.color }} className="w-3 h-3 rounded-full flex-shrink-0" />
+                    <span className="text-[14px] text-zinc-600 font-medium w-20">{c.channel}</span>
+                    <span className="text-[14px] text-zinc-900 font-bold">{c.units}%</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
